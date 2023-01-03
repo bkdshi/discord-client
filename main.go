@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 )
 
 var conf_file string = "bot.conf"
@@ -106,17 +108,19 @@ func sendMessage(bot Bot) {
 	fmt.Println(res.Status)
 }
 
-func showMessages(bot Bot) {
+func showMessages(bot Bot) string {
 	url := fmt.Sprintf("%v/channels/%v/messages", base_url, bot.Channel)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		fmt.Println(err)
+		return ""
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bot %v", bot.Token))
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err)
+		return ""
 	}
 	defer res.Body.Close()
 	body, _ := io.ReadAll(res.Body)
@@ -129,9 +133,71 @@ func showMessages(bot Bot) {
 	messages_json, err := json.MarshalIndent(messages, "", "\t")
 	if err != nil {
 		fmt.Println(err)
-		return
+		return ""
 	}
-	fmt.Println(string(messages_json))
+	return string(messages_json)
+}
+
+func deleteMessages(bot Bot) {
+	messages_json := showMessages(bot)
+	var messages []Message
+	json.Unmarshal([]byte(messages_json), &messages)
+	for i, message := range messages {
+		fmt.Printf("No: %v, ID: %v, content: %v\n", i, message.Id, message.Content)
+	}
+	fmt.Print("Enter No to delete a message.")
+	var input string
+	fmt.Scan(&input)
+	inputs := strings.Split(input, ",")
+
+	var ids []string
+	for _, input := range inputs {
+		num, _ := strconv.Atoi(input)
+		ids = append(ids, messages[num].Id)
+	}
+
+	if len(ids) == 1 {
+		url := fmt.Sprintf("%v/channels/%v/messages/%v", base_url, bot.Channel, ids[0])
+		req, err := http.NewRequest(
+			"DELETE",
+			url,
+			nil,
+		)
+		if err != nil {
+			fmt.Println(err)
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bot %v", bot.Token))
+		client := &http.Client{}
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer res.Body.Close()
+		fmt.Println(res.Status)
+	} else {
+		var jsonStr string
+		jsonStr = fmt.Sprintf(`{"messages": ["%v"]}`, strings.Join(ids, `","`))
+
+		url := fmt.Sprintf("%v/channels/%v/messages/bulk-delete", base_url, bot.Channel)
+		req, err := http.NewRequest(
+			"POST",
+			url,
+			bytes.NewBuffer([]byte(jsonStr)),
+		)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Authorization", fmt.Sprintf("Bot %v", bot.Token))
+		client := &http.Client{}
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer res.Body.Close()
+		fmt.Println(res.Status)
+	}
 }
 
 func main() {
@@ -141,6 +207,7 @@ func main() {
 	register_flag := flag.Bool("register", false, "register bot")
 	send_flag := flag.Bool("send", false, "send a message")
 	show_flag := flag.Bool("show", false, "show messages")
+	delete_flag := flag.Bool("delete", false, "delete messages")
 
 	flag.Parse()
 
@@ -159,6 +226,10 @@ func main() {
 	} else if *send_flag {
 		sendMessage(bot)
 	} else if *show_flag {
-		showMessages(bot)
+		messages := showMessages(bot)
+		fmt.Println(messages)
+
+	} else if *delete_flag {
+		deleteMessages(bot)
 	}
 }
