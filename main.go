@@ -48,7 +48,17 @@ func loadBot() (Bot, error) {
 	return bot, nil
 }
 
-func registerBot() Bot {
+func confirm() bool {
+	fmt.Print("y/n: ")
+	var confirm string
+	fmt.Scan(&confirm)
+	if confirm != "y" {
+		return false
+	}
+	return true
+}
+
+func registerBot() {
 	var bot Bot
 	fmt.Println("Start registaration")
 	fmt.Print("Enter Bot name: ")
@@ -61,16 +71,11 @@ func registerBot() Bot {
 	bot_json, err := json.MarshalIndent(bot, "", "\t")
 	if err != nil {
 		fmt.Println(err)
-		return bot
 	}
 	fmt.Println(string(bot_json))
 
-	fmt.Print("y/n: ")
-	var confirm string
-	fmt.Scan(&confirm)
-
-	if confirm != "y" {
-		return bot
+	if !confirm() {
+		return
 	}
 
 	f, err := os.Create(conf_file)
@@ -79,7 +84,7 @@ func registerBot() Bot {
 		fmt.Println(err)
 	}
 	defer f.Close()
-	return bot
+	return
 }
 
 func sendMessage(bot Bot) {
@@ -149,6 +154,10 @@ func deleteMessages(bot Bot) {
 	var input string
 	fmt.Scan(&input)
 	inputs := strings.Split(input, ",")
+
+	if !confirm() {
+		return
+	}
 
 	var ids []string
 	for _, input := range inputs {
